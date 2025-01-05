@@ -1,0 +1,105 @@
+apiVersion: spark.stackable.tech/v1alpha1
+kind: SparkApplication
+metadata:
+  name: f1-laps-data-sparkjob
+  namespace: sparkapps
+spec:
+  sparkImage:
+    custom: mattdmv/f1-laps-data-sparkjob:v0.0.2
+    productVersion: 3.5.1
+    stackableVersion: 24.7.0
+  mode: cluster
+  mainApplicationFile: local:///my_app/app/laps_data_job/job_run.py
+  env:
+  - name: AWS_SECRET_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: sparkjob-secrets
+        key: AWS_SECRET_ACCESS_KEY
+  - name: AWS_ACCESS_KEY_ID
+    valueFrom:
+      secretKeyRef:
+        name: sparkjob-secrets
+        key: AWS_ACCESS_KEY_ID
+  - name: MINIO_S3_HOST
+    valueFrom:
+      secretKeyRef:
+        name: sparkjob-secrets
+        key: MINIO_S3_HOST
+  - name: NESSIE_HOST
+    valueFrom:
+      secretKeyRef:
+        name: sparkjob-secrets
+        key: NESSIE_HOST
+  - name: NESSIE_PORT
+    valueFrom:
+      secretKeyRef:
+        name: sparkjob-secrets
+        key: NESSIE_PORT
+  - name: AWS_REGION
+    valueFrom:
+      secretKeyRef:
+        name: sparkjob-secrets
+        key: AWS_REGION
+  s3connection:
+    inline:
+      accessStyle: Path
+      host: ${MINIO_S3_HOST}
+      port: 30001
+      credentials:
+        secretClass: s3-credentials-class
+  sparkConf:
+    spark.sql.extensions: org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+    spark.sql.catalog.nessie: org.apache.iceberg.spark.SparkCatalog
+    spark.sql.catalog.nessie.warehouse: s3a://warehouse/nessie
+    spark.sql.catalog.nessie.s3.endpoint: http://${MINIO_S3_HOST}:30001
+    spark.sql.catalog.nessie.catalog-impl: org.apache.iceberg.nessie.NessieCatalog
+    spark.sql.catalog.nessie.io-impl: org.apache.iceberg.aws.s3.S3FileIO
+    spark.sql.catalog.nessie.uri: http://${NESSIE_HOST}:${NESSIE_PORT}/api/v1
+    spark.sql.catalog.nessie.ref: main
+    spark.sql.catalog.nessie.cache-enabled: "false"
+    fs.s3a.access.key: ${AWS_ACCESS_KEY_ID}
+    fs.s3a.secret.key: ${AWS_SECRET_ACCESS_KEY}
+    fs.s3a.endpoint: ${MINIO_S3_HOST}:30001
+    aws.region: ${AWS_REGION}
+    fs.s3a.connection.ssl.enabled: "false"
+    fs.s3a.path.style.access: "true"
+    fs.s3a.attempts.maximum: "1"
+    fs.s3a.impl: org.apache.hadoop.fs.s3a.S3AFileSystem
+    fs.s3a.connection.establish.timeout: "5000"
+    fs.s3a.connection.timeout: "10000"
+  job:
+    podOverrides:
+      spec:
+        nodeSelector:
+          kubernetes.io/arch: arm64
+    config:
+      resources:
+        cpu:
+          min: "1"
+          max: "1"
+        memory:
+          limit: "1Gi"
+  driver:
+    config:
+      affinity:
+        nodeSelector:
+          kubernetes.io/arch: arm64
+      resources:
+        cpu:
+          min: "1"
+          max: "1500m"
+        memory:
+          limit: "1Gi"
+  executor:
+    replicas: 1
+    config:
+      affinity:
+        nodeSelector:
+          kubernetes.io/arch: arm64
+      resources:
+        cpu:
+          min: "1"
+          max: "2"
+        memory:
+          limit: "2Gi"
