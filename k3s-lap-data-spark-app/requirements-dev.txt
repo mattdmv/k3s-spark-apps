@@ -1,0 +1,6 @@
+pyspark==3.5.1
+pydantic
+black
+flake8
+isort
+python-dotenv

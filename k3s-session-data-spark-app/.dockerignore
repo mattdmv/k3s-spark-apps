@@ -1,0 +1,6 @@
+# Exclude unnecessary files and directories
+venv/
+.env
+.gitignore
+requirements-dev.txt
+Dockerfile
